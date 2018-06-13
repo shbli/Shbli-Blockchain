@@ -5,11 +5,52 @@
 #include <string>
 #include <sstream>
 #include <openssl/sha.h>
+#include <openssl/bn.h>
+#include <openssl/ecdsa.h>
+#include <openssl/rand.h>
+#include <openssl/obj_mac.h>
 #include <iomanip>
 
 //refrence block to test computing merkle tree on https://blockchain.info/block/000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506
 
 using namespace std;
+
+// Generate a private key from just the secret parameter
+int EC_KEY_regenerate_key(EC_KEY *eckey, BIGNUM *priv_key)
+{
+    int ok = 0;
+    BN_CTX *ctx = NULL;
+    EC_POINT *pub_key = NULL;
+
+    if (!eckey) return 0;
+
+    const EC_GROUP *group = EC_KEY_get0_group(eckey);
+
+    if ((ctx = BN_CTX_new()) == NULL)
+        goto err;
+
+    pub_key = EC_POINT_new(group);
+
+    if (pub_key == NULL)
+        goto err;
+
+    if (!EC_POINT_mul(group, pub_key, priv_key, NULL, NULL, ctx))
+        goto err;
+
+    EC_KEY_set_private_key(eckey,priv_key);
+    EC_KEY_set_public_key(eckey,pub_key);
+
+    ok = 1;
+
+err:
+
+    if (pub_key)
+        EC_POINT_free(pub_key);
+    if (ctx != NULL)
+        BN_CTX_free(ctx);
+
+    return(ok);
+}
 
 string sha256(const string str)
 {
@@ -94,45 +135,12 @@ static void MerkleTree(QList<string> inputStrings) {
 }
 
 
-//static void MerkleTreeBytes(QList<string> inputStrings) {
-//    QList<string> hashesCombined;
-
-//    for (int i = 0; i < inputStrings.size(); i++) {
-//        //take first transaction
-//        string txa = inputStrings[i];
-//        std::vector<uint8_t> aBytes(txa.begin(), txa.end());
-//        uint8_t hashA[32];
-
-//        SHA256(&aBytes[0], aBytes.size(), (uint8_t*)hashA);
-//        cout << "result " << hashToString(hashA) << endl;
-//        i++;
-//        //combine the transaction with the next one if possible
-//        if (i < inputStrings.size()) {
-//            cout << "hashing " << inputStrings[i] << endl;
-//            hashString += sha256(inputStrings[i]);
-//            cout << "result " << hashString << endl;
-//        }
-
-//        //add the combined transaction to the list
-//        hashesCombined.append(hashString);
-//    }
-
-//    if (hashesCombined.size() > 1) {
-//        MerkleTree(hashesCombined);
-//    }
-//    else {
-//        //done
-//        string finalOutput = sha256(hashesCombined.at(0));
-//        cout << "Fina output " << finalOutput << endl;
-//    }
-//}
-
-
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
     cout << "App start in main.cpp " << endl;
+    printf("OpenSSL version: %s\n",OPENSSL_VERSION_TEXT);
 
 //    QList<string> transactions;
 //    transactions.append("a");
@@ -142,7 +150,7 @@ int main(int argc, char *argv[])
 
 //    MerkleTree(transactions);
 
-    cout << " ** HASHES AS STRINGS ** " << endl;
+    cout << " ** HASHES WHEN COMBINED AS STRINGS ** " << endl;
 
     string HA = sha256("a");
     cout << "HA     " << HA << endl;
@@ -165,7 +173,7 @@ int main(int argc, char *argv[])
     string HABCD = sha256(HAB + HCD);
     cout << "HABCD  " << HABCD << endl;
 
-    cout << " ** HASHES AS BYTES ** " << endl;
+    cout << " ** HASHES WHEN COMBINED AS BYTES ** " << endl;
 
     string txa = "a";
     std::vector<uint8_t> aBytes(txa.begin(), txa.end());
@@ -212,6 +220,39 @@ int main(int argc, char *argv[])
     uint8_t hashABCD[32];
     SHA256(&hashABCDConc[0], hashSize * 2, (uint8_t*)hashABCD);
     cout << "HABCD  " << hashToString(hashABCD) << endl;
+
+
+
+
+
+
+    cout << " ** CREATE PRIVATE KEY **" << endl;
+    //create a private key
+    EC_KEY *pkey;
+    pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
+
+    // The actual byte data
+    unsigned char vch[32];
+    RAND_bytes(vch, sizeof(vch));
+
+    BIGNUM *bn;
+    bn = BN_new();
+    assert(BN_bin2bn(vch, 32, bn));
+    assert(EC_KEY_regenerate_key(pkey, bn));
+    BN_clear_free(bn);
+
+    vector<unsigned char> privkey;
+    assert(pkey != NULL);
+    bool fCompressed = false;
+    EC_KEY_set_conv_form(pkey, fCompressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED);
+    int nSize = i2d_ECPrivateKey(pkey, NULL);
+    assert(nSize);
+    privkey.resize(nSize);
+    unsigned char* pbegin = &privkey[0];
+    int nSize2 = i2d_ECPrivateKey(pkey, &pbegin);
+    assert(nSize == nSize2);
+
+    cout << "PKEY   " << hashToString(pbegin) << endl;
 
     return 0;
     return a.exec();
