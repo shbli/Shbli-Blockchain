@@ -241,18 +241,18 @@ int main(int argc, char *argv[])
     assert(EC_KEY_regenerate_key(pkey, bn));
     BN_clear_free(bn);
 
-    vector<unsigned char> privkey;
-    assert(pkey != NULL);
-    bool fCompressed = false;
-    EC_KEY_set_conv_form(pkey, fCompressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED);
-    int nSize = i2d_ECPrivateKey(pkey, NULL);
-    assert(nSize);
-    privkey.resize(nSize);
-    unsigned char* pbegin = &privkey[0];
-    int nSize2 = i2d_ECPrivateKey(pkey, &pbegin);
-    assert(nSize == nSize2);
+    //get private key
+    uint8_t priv[32];
+    const BIGNUM *priv_bn = EC_KEY_get0_private_key(pkey);
+    if (!priv_bn) {
+        puts("Unable to decode private key");
+        return -1;
+    }
+    BN_bn2bin(priv_bn, priv);
 
-    cout << "PKEY   " << hashToString(pbegin) << endl;
+    //examples
+    //8262b0cceb4f174efe5f37d36e8a18f236568b402969f6b28fe8af8a18e46daa
+    cout << "PKEY   " << hashToString(priv) << endl;
 
     return 0;
     return a.exec();
