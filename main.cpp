@@ -7,6 +7,7 @@
 #include <openssl/sha.h>
 #include <iomanip>
 
+//refrence block to test computing merkle tree on https://blockchain.info/block/000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506
 
 using namespace std;
 
@@ -23,6 +24,17 @@ string sha256(const string str)
         ss << hex << setw(2) << setfill('0') << (int)hash[i];
     }
     return ss.str();
+}
+
+
+uint8_t* twoSHA256(uint8_t* hashA, uint8_t* hashB) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, hashA, 32);
+    SHA256_Update(&sha256, hashB, 32);
+    SHA256_Final(hash, &sha256);
+    return hash;
 }
 
 string hashToString(uint8_t* hash) {
@@ -179,28 +191,28 @@ int main(int argc, char *argv[])
     SHA256(&dBytes[0], dBytes.size(), (uint8_t*)hashD);
     cout << "HD     " << hashToString(hashD) << endl;
 
+    const int hashSize = 32;
+    uint8_t *hashABConc = new uint8_t[hashSize * 2];
+    copy(hashA, hashA + hashSize, hashABConc);
+    copy(hashB, hashB + hashSize, hashABConc + hashSize);
+    uint8_t hashAB[32];
+    SHA256(&hashABConc[0], hashSize * 2, (uint8_t*)hashAB);
+    cout << "HAB    " << hashToString(hashAB) << endl;
 
-    //0d54cada63fe4f032265dcb10126a524f86a19c8a7f78e86d899a30a08b99d3d
-    //7b80916a55fe09ce239d3d2c90f7bbf2ca3e5debea28f42eaae8d05bcab79c05
-    //
-    //combine A + B into one hash
-    uint8_t hashAB[64];
-    stringstream ss;
-    ss << hashA << hashB;
-    ss >> hashAB;
-    uint8_t ABHashed[32];
-    SHA256(&hashAB[0], 64, (uint8_t*)ABHashed);
-    cout << "HAB    " << hashToString(ABHashed) << endl;
+    uint8_t *hashCDConc = new uint8_t[hashSize * 2];
+    copy(hashC, hashC + hashSize, hashCDConc);
+    copy(hashD, hashD + hashSize, hashCDConc + hashSize);
+    uint8_t hashCD[32];
+    SHA256(&hashCDConc[0], hashSize * 2, (uint8_t*)hashCD);
+    cout << "HCD    " << hashToString(hashCD) << endl;
 
+    uint8_t *hashABCDConc = new uint8_t[hashSize * 2];
+    copy(hashAB, hashAB + hashSize, hashABCDConc);
+    copy(hashCD, hashCD + hashSize, hashABCDConc + hashSize);
+    uint8_t hashABCD[32];
+    SHA256(&hashABCDConc[0], hashSize * 2, (uint8_t*)hashABCD);
+    cout << "HABCD  " << hashToString(hashABCD) << endl;
 
-//    //combine C + D into one hash
-//    uint8_t hashCD[64];
-//    ss.clear();
-//    ss << hashC << hashD;
-//    ss >> hashCD;
-//    uint8_t CDHashed[32];
-//    SHA256(&hashCD[0], 64, (uint8_t*)CDHashed);
-//    cout << "HCD    " << hashToString(CDHashed) << endl;
-
+    return 0;
     return a.exec();
 }
