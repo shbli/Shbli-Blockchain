@@ -1,6 +1,7 @@
 
 TEMPLATE = app
 TARGET = shbli_blockchain
+CONFIG += c++14
 
 
 SOURCES += \
