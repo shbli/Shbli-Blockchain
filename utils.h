@@ -9,9 +9,13 @@
 #include <openssl/ecdsa.h>
 #include <openssl/rand.h>
 #include <openssl/obj_mac.h>
+#include <openssl/ripemd.h>
 #include <iomanip>
+#include <QByteArray>
+#include <QCryptographicHash>
 
 using namespace std;
+
 
 // Generate a private key from just the secret parameter
 int EC_KEY_regenerate_key(EC_KEY *eckey, BIGNUM *priv_key)
@@ -49,5 +53,21 @@ err:
 
     return(ok);
 }
+
+QByteArray SHA256(QByteArray input) {
+    return QCryptographicHash::hash(input, QCryptographicHash::Sha256);
+}
+
+QByteArray RIPEMD160(QByteArray input) {
+    unsigned char digest[RIPEMD160_DIGEST_LENGTH];
+
+    RIPEMD160_CTX ctx;
+    RIPEMD160_Init(&ctx);
+    RIPEMD160_Update(&ctx, input.data(), input.size());
+    RIPEMD160_Final(digest, &ctx);
+
+    return QByteArray::fromRawData((char*)digest, RIPEMD160_DIGEST_LENGTH);
+}
+
 
 #endif // UTILS_H

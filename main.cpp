@@ -1,7 +1,5 @@
 #include <QCoreApplication>
 #include <QList>
-#include <QDebug>
-#include <QCryptographicHash>
 #include "utils.h"
 //refrence block to test computing merkle tree on https://blockchain.info/block/000000000003ba27aa200b1cecaad478d2b00432346c3f1f3986da1afd33e506
 
@@ -57,25 +55,25 @@ Output: e76328b6ca10676c686a0d534e8222ad8da04fdfe14c6f6ff67d08cbbd24c605
 void merkleTreeHashTests() {
     cout << " ** HASHES OF MERKLE TREE TEST ** " << endl;
 
-    QByteArray txa = QCryptographicHash::hash(QByteArray("a"), QCryptographicHash::Sha256);
+    QByteArray txa = SHA256(QByteArray("a"));
     cout << "HA     " << txa.toHex().toStdString() << endl;
 
-    QByteArray txb = QCryptographicHash::hash(QByteArray("b"), QCryptographicHash::Sha256);
+    QByteArray txb = SHA256(QByteArray("b"));
     cout << "HB     " << txb.toHex().toStdString() << endl;
 
-    QByteArray txc = QCryptographicHash::hash(QByteArray("c"), QCryptographicHash::Sha256);
+    QByteArray txc = SHA256(QByteArray("c"));
     cout << "HC     " << txc.toHex().toStdString() << endl;
 
-    QByteArray txd = QCryptographicHash::hash(QByteArray("d"), QCryptographicHash::Sha256);
+    QByteArray txd = SHA256(QByteArray("d"));
     cout << "HD     " << txd.toHex().toStdString() << endl;
 
-    QByteArray txab = QCryptographicHash::hash(txa + txb, QCryptographicHash::Sha256);
+    QByteArray txab = SHA256(txa + txb);
     cout << "HAB    " << txab.toHex().toStdString() << endl;
 
-    QByteArray txcd = QCryptographicHash::hash(txc + txd, QCryptographicHash::Sha256);
+    QByteArray txcd = SHA256(txc + txd);
     cout << "HCD    " << txcd.toHex().toStdString() << endl;
 
-    QByteArray txabcd = QCryptographicHash::hash(txab + txcd, QCryptographicHash::Sha256);
+    QByteArray txabcd = SHA256(txab + txcd);
     cout << "HABCD  " << txabcd.toHex().toStdString() << endl;
 }
 
@@ -107,96 +105,133 @@ void createPrivatePublicKeyPairTest() {
     uint8_t priv[32];
     BN_bn2bin(priv_bn, priv);
 
-    vector<unsigned char> vpriv(priv, priv + 32);
-
     QByteArray privbyteArray = QByteArray::fromRawData((char*)priv, 32);
 
     //examples
     //8262b0cceb4f174efe5f37d36e8a18f236568b402969f6b28fe8af8a18e46daa
-    cout << "PRKEY  " << privbyteArray.toHex().toUpper().toStdString() << endl;
+    cout << "PRKEY  " << privbyteArray.toHex().toStdString() << endl;
 
-    //get public key from the private key
-    //PRKEY  3df2a83cb6a5c54615e1fd310a24b57e69db3cdc916b9a987df7994fada8e77c
-    //PUKEY  02ee978588f548379b58d30ed4165de9d985adc53b97e0c569abfb77f992a175
     bool fCompressed = true;
     EC_KEY_set_conv_form(pkey, fCompressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED);
     int nSize = i2o_ECPublicKey(pkey, NULL);
     assert(nSize);
-    assert(nSize <= 65);
-    unsigned char pubc[65];
+    unsigned char pubc[nSize];
     unsigned char *pbegin = pubc;
     int nSize2 = i2o_ECPublicKey(pkey, &pbegin);
     assert(nSize == nSize2);
 
-    QByteArray pubcbyteArray = QByteArray::fromRawData((char*)pubc, 32);
-    QByteArray addrbyteArray = QCryptographicHash::hash(pubcbyteArray, QCryptographicHash::Sha256);
-    cout << "PRKEY  " << pubcbyteArray.toHex().toUpper().toStdString() << endl;
-    cout << "ADDRS  " << addrbyteArray.toHex().toUpper().toStdString() << endl;
+    QByteArray pubcbyteArray = QByteArray::fromRawData((char*)pubc, nSize);
+    QByteArray addrbyteArray = SHA256(pubcbyteArray);
+    cout << "PUKEY  " << pubcbyteArray.toHex().toStdString() << endl;
+    cout << "ADDRS  " << addrbyteArray.toHex().toStdString() << endl;
+
+    //sign a messgae
+    char* hash = addrbyteArray.data();
+    ECDSA_SIG *signature = ECDSA_do_sign((unsigned char*) hash, addrbyteArray.size(), pkey);
+    if (signature == NULL) {
+        cout << "Unable to create signature";
+    }
+
+    std::vector<unsigned char> vchSig;
+    nSize = ECDSA_size(pkey);
+    vchSig.resize(nSize); // Make sure it is big enough
+    unsigned char *pos = &vchSig[0];
+    nSize = i2d_ECDSA_SIG(signature, &pos);
+    vchSig.resize(nSize); // Shrink to fit actual size
+
+    QByteArray decSignature = QByteArray::fromRawData((char*)&vchSig[0], vchSig.size());
+    cout << "SGDEC  " << decSignature.toHex().toStdString() << endl;
+
+
+    const BIGNUM *pr = NULL;
+    const BIGNUM *ps = NULL;
+    ECDSA_SIG_get0(signature, &pr, &ps);
+
+    string rHex = BN_bn2hex(pr);
+    string sHex = BN_bn2hex(ps);
+
+    cout << "RHEX  " << rHex << endl;
+    cout << "SHEX  " << sHex << endl;
+
+    ECDSA_SIG_free(signature);
 }
 
-//void loadPrivateKeyAndGeneratePublicKeyTest() {
-//    cout << " ** LOAD PRIVATE KEY **" << endl;
-//    //load private key
-//    EC_KEY *pkey;
-//    pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
-//    if (pkey == NULL) {
-//        cout << "EC_KEY_new_by_curve_name failed";
-//        return;
-//    }
+void loadPrivateKeyAndGeneratePublicKeyTest() {
+    cout << " ** LOAD PRIVATE KEY **" << endl;
+//      TEST PRIVATE PUBLIC ADDRESS
+    //    PRKEY  76bc5d790827afb6d9858d8e84d9d1077356e3cdc491d1c7333185b527261b45
+    //    PUKEY  02a1a59f8e922eee0d8a678b08a25c546ba329d9dc617cdb700b71b969effa3a0a
+    //    ADDRS  6bf349ad7b5029650ac1bc6e1256e602afdb032f6cdba631c2e36e8156dd4d70
+    //    RHEX  0D607DAAB9221424B3B9EF0E4DE87F61B8E885906B335D36F53936CF55352472
+    //    SHEX  A0F31DD521E5DE290405326813FFA0A1BEAD7A6BC7AF2FFCBE6FCF02AC8AB19B
 
-//    uint8_t priv[32];
-//    cout << "PRKEY  " << byte2hex(priv) << endl;
-//    string hexKey = byte2hex(priv);
-//    vector<unsigned char> parsedKey = ParseHex(hexKey);
-//    const uint8_t* pbegin = &parsedKey[0];
-//    if (d2i_ECPrivateKey(&pkey, &pbegin, parsedKey.size())) {
-//        // d2i_ECPrivateKey returns true if parsing succeeds.
-//        // This doesn't necessarily mean the key is valid.
-//        if (!EC_KEY_check_key(pkey)) {
-//            cout << "EC_KEY_check_key failed" << endl;
-//            return;
-//        }
-//    } else {
-//        cout << "d2i_ECPrivateKey failed" << endl;
-//        return;
-//    }
+    //load private key
+    //get public key from the private key
+    string priv_hex = "76bc5d790827afb6d9858d8e84d9d1077356e3cdc491d1c7333185b527261b45";
+    cout << "PRKEY  " << priv_hex << endl;
 
-//    //get private key
 
-//    const BIGNUM *priv_bn = EC_KEY_get0_private_key(pkey);
-//    if (!priv_bn) {
-//        cout << "Unable to decode private key" << endl;
-//        return;
-//    }
-//    BN_bn2bin(priv_bn, priv);
+    EC_KEY *pkey;
+    pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
 
-//    unsigned char vch[32];
-//    int nBytes = BN_num_bytes(priv_bn);
-//    int n=BN_bn2bin(priv_bn,&vch[32 - nBytes]);
-//    assert(n == nBytes);
-//    memset(vch, 0, 32 - nBytes);
+    // convert priv key from hexadecimal to BIGNUM
+    BIGNUM *priv_bn = BN_new();
+    BN_hex2bn( &priv_bn, priv_hex.c_str() );
 
-//    //examples
-//    //PRKEY  3df2a83cb6a5c54615e1fd310a24b57e69db3cdc916b9a987df7994fada8e77c
-//    cout << "PRKEY  " << byte2hex(priv) << endl;
-//    cout << "PRKEY  " << EncodeBase64(priv, 32) << endl;
+    assert(EC_KEY_regenerate_key(pkey, priv_bn));
 
-//    //get public key from the private key. Example of input and output is
-//    //PRKEY  3df2a83cb6a5c54615e1fd310a24b57e69db3cdc916b9a987df7994fada8e77c
-//    //PUKEY  02ee978588f548379b58d30ed4165de9d985adc53b97e0c569abfb77f992a175
-//    bool fCompressed = true;
-//    EC_KEY_set_conv_form(pkey, fCompressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED);
-//    int nSize = i2o_ECPublicKey(pkey, NULL);
-//    assert(nSize);
-//    assert(nSize <= 65);
-//    unsigned char pubc[65];
-//    unsigned char *pubbegin = pubc;
-//    int nSize2 = i2o_ECPublicKey(pkey, &pubbegin);
-//    assert(nSize == nSize2);
+    bool fCompressed = true;
+    EC_KEY_set_conv_form(pkey, fCompressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED);
+    int nSize = i2o_ECPublicKey(pkey, NULL);
+    assert(nSize);
+    unsigned char pubc[nSize];
+    unsigned char *pbegin = pubc;
+    int nSize2 = i2o_ECPublicKey(pkey, &pbegin);
+    assert(nSize == nSize2);
 
-//    cout << "PUKEY  " << byte2hex(pubc) << endl;
-//}
+    QByteArray pubcbyteArray = QByteArray::fromRawData((char*)pubc, nSize);
+    QByteArray addrbyteArray = SHA256(pubcbyteArray);
+    cout << "PUKEY  " << pubcbyteArray.toHex().toStdString() << endl;
+    cout << "ADDRS  " << addrbyteArray.toHex().toStdString() << endl;
+    assert(pubcbyteArray.toHex().toStdString() == "02a1a59f8e922eee0d8a678b08a25c546ba329d9dc617cdb700b71b969effa3a0a");
+    assert(addrbyteArray.toHex().toStdString() == "6bf349ad7b5029650ac1bc6e1256e602afdb032f6cdba631c2e36e8156dd4d70");
+}
 
+void verifySignautre() {
+    //test values (We shall not use the private key to validate a signature. the test values here are just available for validation
+//    PRKEY  b236c288a84073f2de6f04ec367e39892984ad19c44da7b0f6a697f5b0de594d
+//    PUKEY  02023349ab48f6a5e28aec00dfbee344cd1f8af0410837ac6857efd0735dc0105d
+//    ADDRS  29a521d3b9200ada112e1c9dc25c341e25617de8d11d2c1199f6c604ec33d2a4
+//    SGDEC  304402201a38a76a7c15baa58fd840a44527e1c0ee01fa96003d1744932784fdb09bd39d02201a9f91410f5e7edee0593eb878ad6c8e5ac7ab164260119ea3720ca8a10e64d8
+//    RHEX  1A38A76A7C15BAA58FD840A44527E1C0EE01FA96003D1744932784FDB09BD39D
+//    SHEX  1A9F91410F5E7EDEE0593EB878AD6C8E5AC7AB164260119EA3720CA8A10E64D8
+
+    cout << " ** VERIFY SIGNATURE **" << endl;
+
+    //Load our public key
+    EC_KEY *pkey;
+    pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
+
+    QByteArray pubKeyByte = QByteArray::fromHex(QByteArray::fromStdString("02023349ab48f6a5e28aec00dfbee344cd1f8af0410837ac6857efd0735dc0105d"));
+    char* data = pubKeyByte.data();
+    const char** dataP = (const char **)(&data);
+    const unsigned char **pbegin = (const unsigned char **)(dataP);
+    pkey = o2i_ECPublicKey(&pkey, pbegin, pubKeyByte.size());
+
+    if (!EC_KEY_check_key(pkey)) {
+        cout << "EC_KEY_check_key failed" << endl;
+        return;
+    }
+
+    QByteArray addrByteArray = QByteArray::fromHex( QByteArray::fromStdString("29a521d3b9200ada112e1c9dc25c341e25617de8d11d2c1199f6c604ec33d2a4") );
+    QByteArray sgdecByteArray = QByteArray::fromHex( QByteArray::fromStdString("304402201a38a76a7c15baa58fd840a44527e1c0ee01fa96003d1744932784fdb09bd39d02201a9f91410f5e7edee0593eb878ad6c8e5ac7ab164260119ea3720ca8a10e64d8") );
+
+    if (ECDSA_verify(0, (const unsigned char*) addrByteArray.data(), addrByteArray.size(), (const unsigned char*) sgdecByteArray.data(), sgdecByteArray.size(), pkey)) {
+        cout << "ECDSA_verify passed!" << endl;
+    } else {
+        cout << "ECDSA_verify failed!" << endl;
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -207,7 +242,8 @@ int main(int argc, char *argv[])
 
     merkleTreeHashTests();
     createPrivatePublicKeyPairTest();
-    //loadPrivateKeyAndGeneratePublicKeyTest();
+    loadPrivateKeyAndGeneratePublicKeyTest();
+    verifySignautre();
 
     return 0;
     return a.exec();
