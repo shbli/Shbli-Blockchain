@@ -12,3 +12,6 @@ SOURCES += \
     INCLUDEPATH += "$${_OPENSSL_PATH}/include/"
     LIBS += -L$${_OPENSSL_PATH}/lib
     LIBS += -lssl -lcrypto # using dynamic lib (not sure if you need that "-mt" at the end or not)
+
+HEADERS += \
+    utils.h
