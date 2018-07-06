@@ -241,6 +241,38 @@ void verifySignautre() {
     }
 }
 
+bool validateDiffculty(QByteArray input) {
+    QDataStream ds(input);
+    unsigned long long size;
+    ds >> size;
+    if (size < 10000000000000) {
+        cout << endl << "Size is " << size;
+        return true;
+    }
+    return false;
+}
+
+void proofOfWorkMining(QByteArray blockdata) {
+    int nounce = 0;
+    QByteArray data;
+    QByteArray nounceByte;
+    QByteArray output;
+
+    while (nounce < INT_MAX) {
+        nounceByte.setNum(nounce);
+        data = blockdata + nounceByte;
+        output = SHA256(data);
+        cout << '\r' << "POW Mining block " << output.toHex().toStdString() << flush;
+        if (validateDiffculty(output)) {
+            break;
+        } else {
+            nounce++;
+        }
+    }
+    cout << endl;
+    cout << "Block mined with nounce " << nounce << endl;
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -252,6 +284,7 @@ int main(int argc, char *argv[])
     createPrivatePublicKeyPairTest();
     loadPrivateKeyAndGeneratePublicKeyTest();
     verifySignautre();
+    proofOfWorkMining(QByteArray("Block data"));
 
     return 0;
     return a.exec();

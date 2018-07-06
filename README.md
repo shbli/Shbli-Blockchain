@@ -7,9 +7,9 @@ SHA256 and RIPEMD160 hashing (Done)
 
 Create singautre from private key and validate the signature with public key (Done)
 
-Creating Merkle trees (Partially done).
+Creating Merkle trees (Done).
 
-Proof of work.
+A simple proof of work (Done).
 
 Convert between different representations (base16, base58, base64)
 

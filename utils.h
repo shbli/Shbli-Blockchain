@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <QByteArray>
 #include <QCryptographicHash>
+#include "limits.h"
 
 using namespace std;
 
