@@ -21,35 +21,35 @@ Output: e76328b6ca10676c686a0d534e8222ad8da04fdfe14c6f6ff67d08cbbd24c605
 
 */
 
-//static void MerkleTree(QList<string> inputStrings) {
-//    QList<string> hashesCombined;
+static void MerkleTree(QList<QByteArray> inputs) {
+    QList<QByteArray> hashesCombined;
 
-//    for (int i = 0; i < inputStrings.size(); i++) {
-//        //take first transaction
-//        cout << "hashing " << inputStrings[i] << endl;
-//        string hashString = sha256(inputStrings[i]);
-//        cout << "result " << hashString << endl;
-//        i++;
-//        //combine the transaction with the next one if possible
-//        if (i < inputStrings.size()) {
-//            cout << "hashing " << inputStrings[i] << endl;
-//            hashString += sha256(inputStrings[i]);
-//            cout << "result " << hashString << endl;
-//        }
+    for (int i = 0; i < inputs.size(); i++) {
+        //take first transaction
+        cout << "hashing " << inputs[i].toHex().toStdString() << endl;
+        QByteArray combinedHash = SHA256(inputs[i]);
+        cout << "result " << combinedHash.toHex().toStdString() << endl;
+        i++;
+        //combine the transaction with the next one if possible
+        if (i < inputs.size()) {
+            cout << "hashing " << inputs[i].toHex().toStdString() << endl;
+            combinedHash += SHA256(inputs[i]);
+            cout << "result " << combinedHash.toHex().toStdString() << endl;
+        }
 
-//        //add the combined transaction to the list
-//        hashesCombined.append(hashString);
-//    }
+        //add the combined transaction to the list
+        hashesCombined.append(combinedHash);
+    }
 
-//    if (hashesCombined.size() > 1) {
-//        MerkleTree(hashesCombined);
-//    }
-//    else {
-//        //done
-//        string finalOutput = sha256(hashesCombined.at(0));
-//        cout << "Fina output " << finalOutput << endl;
-//    }
-//}
+    if (hashesCombined.size() > 1) {
+        MerkleTree(hashesCombined);
+    }
+    else {
+        //done
+        QByteArray finalOutput = SHA256(hashesCombined.at(0));
+        cout << "Fina output " << finalOutput.toHex().toStdString() << endl;
+    }
+}
 
 
 void merkleTreeHashTests() {
@@ -75,6 +75,14 @@ void merkleTreeHashTests() {
 
     QByteArray txabcd = SHA256(txab + txcd);
     cout << "HABCD  " << txabcd.toHex().toStdString() << endl;
+
+    QList<QByteArray> input;
+    input.append(QByteArray("a"));
+    input.append(QByteArray("b"));
+    input.append(QByteArray("c"));
+    MerkleTree(input);
+    input.append(QByteArray("d"));
+    MerkleTree(input);
 }
 
 

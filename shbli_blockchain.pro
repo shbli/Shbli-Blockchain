@@ -15,3 +15,6 @@ SOURCES += \
 
 HEADERS += \
     utils.h
+
+DISTFILES += \
+    README.md
